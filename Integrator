@@ -1,0 +1,167 @@
+#include <math.h>
+#include <stdio.h>
+#include <time.h>
+#include <stdlib.h>
+
+#define MAXPNT  10000                /* maximum number of points */
+
+void leapstep();                /* routine to take one step */
+
+void accel();                    /* accel. for harmonic osc. */
+
+void printstate();                /* print out system state   */
+
+int main(argc, argv)
+int argc;
+char *argv[];
+{
+    int n, mstep, nout, nstep;
+    double x[MAXPNT], y[MAXPNT], z[MAXPNT], q[MAXPNT], r[MAXPNT], Ve[MAXPNT], V[MAXPNT],u[MAXPNT], v[MAXPNT], w[MAXPNT],tnow, dt, G, m[MAXPNT];
+    
+    srand(time(NULL));
+    
+    /* first, set up initial conditions */
+    double X1;
+    double X2;
+    double X3;
+    double X4;
+    double X5;
+    double X6;
+    double X7;
+    
+    n = 10000.0;                        /* set number of points     */
+    G = 1;
+    
+    int i;
+    for(i = 0; i < n; i++)
+    {
+        X1 = ((double)rand()/RAND_MAX);
+        X2 = ((double)rand()/RAND_MAX);
+        X3 = ((double)rand()/RAND_MAX);
+        X4 = ((double)rand()/RAND_MAX);
+        X5 = ((double)rand()/RAND_MAX);
+        X6 = ((double)rand()/RAND_MAX);
+        X7 = ((double)rand()/RAND_MAX);
+        
+        m[i] = 1.0/n;
+        r[i] = 1.0/(sqrt(pow(X1,-2.0/3.0)-1.0));
+        
+        z[i]=(1.0-2.0*X2)*r[i];
+        y[i]=pow(pow(r[i],2.0)-pow(z[i],2.0),1.0/2.0)*sin(2.0*M_PI*X3);
+        x[i]=pow(pow(r[i],2.0)-pow(z[i],2.0),1.0/2.0)*cos(2.0*M_PI*X3);
+        
+        Ve[i]=pow(2.0,1.0/2.0)*pow(1.0+pow(r[i],2.0),-1.0/4.0);
+        while (.1*X5 >= pow(X4,2.0)*pow(1.0-pow(X4,2.0),7.0/2.0)) {
+            X4 = ((double)rand()/RAND_MAX);
+            X5 = ((double)rand()/RAND_MAX);
+        }
+        q[i]=X4;
+        V[i] = q[i]*Ve[i];
+
+        w[i] = 0;
+        u[i] = 0;
+        v[i] = 0;
+        //w[i] = (1.0-2.0*X6)*V[i];
+        //u[i] = pow(pow(V[i],2.0)-pow(w[i],2.0),1.0/2.0)*cos(2.0*M_PI*X7);
+        //v[i] = pow(pow(V[i],2.0)-pow(w[i],2.0),1.0/2.0)*sin(2.0*M_PI*X7);
+    }
+    
+    /* next, set integration parameters */
+    
+    mstep = 100;                /* number of steps to take  */
+    nout = 1;                    /* steps between outputs    */
+    dt = 1.0 / 100.0;                /* timestep for integration */
+    
+    for (nstep = 0; nstep < mstep; nstep++)
+    {                                               /* loop mstep times in all  */
+        if (nstep % nout == 0)                      /* if time to output state  */
+            printstate(x, y, z,n);        /* then call output routine */
+        leapstep(x, u, y, v, z, w, n, dt, m);              /* take integration step    */
+        tnow = tnow + dt;                           /* and update value of time */
+    }
+    if (mstep % nout == 0)                          /* if last output wanted    */
+        printstate(x, y, z,n);          /* then output last step    */
+        
+        }
+
+/*
+ * LEAPSTEP: take one step using the leap-from integrator, formulated
+ * as a mapping from t to t + dt.  WARNING: this integrator is not
+ * accurate unless the timestep dt is fixed from one call to another.
+ */
+
+void leapstep(double *x, double *u, double *y, double *v, double *z, double *w, int n, double dt, double* m)
+{
+    int i;
+    double ax[MAXPNT];
+    double ay[MAXPNT];
+    double az[MAXPNT];
+    
+    accel(ax, ay, az, x, y, z, n, m);
+    for (i = 0; i < n; i++)
+    {
+        u[i] += 0.5 * dt * ax[i];
+        v[i] += 0.5 * dt * ay[i];
+        w[i] += 0.5 * dt * az[i];
+    }
+    for (i = 0; i < n; i++)            /* loop over points again...*/
+    {
+        x[i] += dt * u[i];        /* advance pos by full-step */
+        y[i] += dt * v[i];
+        z[i] += dt * w[i];
+    }
+    accel(ax, ay, az, x, y, z, n, m);                /* call acceleration code   */
+    for (i = 0; i < n; i++)            /* loop over all points...  */
+    {
+        u[i] += 0.5 * dt * ax[i];
+        v[i] += 0.5 * dt * ay[i];
+        w[i] += 0.5 * dt * az[i];
+    }
+    
+}
+
+/*
+ * ACCEL: compute accelerations for harmonic oscillator(s).
+ */
+
+void accel(ax, ay, az, x, y, z, n, m)
+int n;                        /* number of points         */
+double ax[];                    /* accelerations of points  */
+double ay[];
+double az[];
+double x[];                    /* positions of points      */
+double y[];
+double z[];
+double m[];
+{
+    int i, j;
+    
+    for (i = 0; i < n; i++)
+    {
+        ax[i] = 0;
+        ay[i] = 0;
+        az[i] = 0;
+        for(j = 0; j < n; j++)
+        {
+            if(i == j)
+                continue;
+            double rad = sqrt( (pow((x[i] - x[j]), 2)) + (pow((y[i] - y[j]), 2)) + (pow((z[i] - z[j]), 2)) );
+            ax[i] += -(m[j] * (x[i] - x[j]))/(pow(rad, 3.0));
+            ay[i] += -(m[j] * (y[i] - y[j]))/(pow(rad, 3.0));
+            az[i] += -(m[j] * (z[i] - z[j]))/(pow(rad, 3.0));
+        }
+    }
+}
+
+void printstate(x, y, z, n)
+int n;                          /* number of points         */
+double x[];                     /* positions of all points  */
+double y[];
+double z[];
+                  /* current value of time    */
+{
+    int i;
+    
+    for (i = 0; i < n; i++)            /* loop over all points...  */
+        printf("%d %5.3f %5.3f %5.3f \n", i, x[i], y[i], z[i]);
+        }
